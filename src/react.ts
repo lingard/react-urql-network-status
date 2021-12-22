@@ -4,10 +4,9 @@ import * as Eq from 'fp-ts/Eq'
 import * as O from 'fp-ts/Option'
 import { map, subscribe } from 'wonka'
 import { useClient } from 'urql'
-import { emptyNetworkStatus } from './state'
+import { emptyNetworkStatus, NetworkStatus } from './state'
 import { ClientWithNetworkStatus } from './networkStatusExchange'
 import { skipUntilChanged } from './operators'
-import { NetworkStatus } from '.'
 
 export const useNetworkStatusSubscription = <A>(
   fa: (state: NetworkStatus) => A,

@@ -14,7 +14,6 @@ import { map, makeSubject, publish, filter, Subject, Source } from 'wonka'
 import { some } from 'fp-ts/lib/Option'
 import { networkStatusExchange } from '../src'
 import {
-  networkStatusProgram,
   emptyNetworkStatus,
   NetworkStatusProgram,
   operationError
@@ -41,7 +40,6 @@ beforeEach(() => {
   shouldRespond = false
   shouldError = false
   input = makeSubject<Operation>()
-  program = networkStatusProgram()
 
   const forward = (s: Source<Operation>) => {
     return pipe(
@@ -67,7 +65,7 @@ beforeEach(() => {
 describe('useUrqlNetworkStatus', () => {
   it('should render', () => {
     const { source: ops$, next, complete } = input
-    const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = networkStatusExchange()(exchangeArgs)(ops$)
 
     const { result } = renderHook(() => useUrqlNetworkStatus(), {
       wrapper: ({ children }) => <Provider value={client}>{children}</Provider>
@@ -95,7 +93,7 @@ describe('useUrqlNetworkStatus', () => {
     shouldRespond = true
 
     const { source: ops$, next, complete } = input
-    const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = networkStatusExchange()(exchangeArgs)(ops$)
 
     const { result } = renderHook(() => useUrqlNetworkStatus(), {
       wrapper: ({ children }) => <Provider value={client}>{children}</Provider>

@@ -1,3 +1,3 @@
 export { NetworkStatus } from './state'
-export * from './networkStatusExchange'
+export { networkStatusExchange } from './networkStatusExchange'
 export * from './react'

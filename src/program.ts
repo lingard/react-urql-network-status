@@ -19,15 +19,6 @@ export function program<Model, Msg>(
 
   const { source, next } = makeSubject<Model>()
   const model$ = pipe(source, takeUntil(stop))
-  // const dispatch: Dispatch<Msg> = (msg) =>
-  //   pipe(
-  //     model$,
-  //     // takeLast(1),
-  //     tap((model) => {
-  //       return pipe(update(model, msg), next)
-  //     }),
-  //     publish
-  //   )
   const dispatch: Dispatch<Msg> = (msg) => pipe(update(value, msg), next)
 
   pipe(

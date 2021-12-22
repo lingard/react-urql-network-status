@@ -2,7 +2,7 @@ import { Exchange, Operation, Client, OperationType } from 'urql'
 import { tap, filter, share, merge } from 'wonka'
 import * as P from 'fp-ts/Predicate'
 import { pipe } from 'fp-ts/function'
-import { NetworkStatusProgram } from './state'
+import { networkStatusProgram, NetworkStatusProgram } from './state'
 
 const isOperationType = (type: OperationType) => (operation: Operation) =>
   operation.kind === type
@@ -23,7 +23,7 @@ export interface ClientWithNetworkStatus extends Client {
   _networkStatus: NetworkStatusProgram
 }
 
-export const networkStatusExchange =
+export const createNetworkStatusExchange =
   (program: NetworkStatusProgram): Exchange =>
   ({ forward, client }) =>
   (ops$) => {
@@ -31,7 +31,6 @@ export const networkStatusExchange =
     const shouldHandle = shouldHandleOperation(client)
 
     Object.assign(client, { _networkStatus: program })
-    // client._networkStatus = program
 
     const operations$ = pipe(
       ops$,
@@ -72,3 +71,6 @@ export const networkStatusExchange =
 
     return merge([operations$, rest$])
   }
+
+export const networkStatusExchange = () =>
+  createNetworkStatusExchange(networkStatusProgram())

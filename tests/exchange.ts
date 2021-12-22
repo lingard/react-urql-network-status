@@ -12,7 +12,7 @@ import {
   NetworkStatusAction,
   networkStatusActionError
 } from '../src/state'
-import { networkStatusExchange } from '../src/networkStatusExchange'
+import { createNetworkStatusExchange } from '../src/networkStatusExchange'
 
 const error = new Error('')
 const combinedError = new CombinedError({
@@ -53,7 +53,7 @@ beforeEach(() => {
 describe('networkStatusExchange', () => {
   it('handles successful requests', () => {
     const { source: ops$, next, complete } = input
-    const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = createNetworkStatusExchange(program)(exchangeArgs)(ops$)
 
     publish(exchange)
     next(queryOperation)
@@ -79,7 +79,7 @@ describe('networkStatusExchange', () => {
     shouldError = true
 
     const { source: ops$, next, complete } = input
-    const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = createNetworkStatusExchange(program)(exchangeArgs)(ops$)
 
     publish(exchange)
     next(queryOperation)
@@ -100,7 +100,7 @@ describe('networkStatusExchange', () => {
 
   it('ignores irrelevant operations', () => {
     const { source: ops$, next, complete } = input
-    const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = createNetworkStatusExchange(program)(exchangeArgs)(ops$)
 
     publish(exchange)
     next(subscriptionOperation)

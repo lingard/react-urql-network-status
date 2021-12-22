@@ -11,12 +11,10 @@ import ReactDOM from 'react-dom';
 import { createClient } from 'urql';
 import { createNetworkStatusNotifier } from 'react-urql-network-status';
 
-const { exchange, useUrqlNetworkStatus } = createNetworkStatusNotifier();
-
 const GlobalLoadingIndicator = () =>  {
-  const status = useUrqlNetworkStatus();
+  const pending = useNumPendingQueries();
 
-  if (status.query.pending.length === 0) {
+  if (pending === 0) {
     return null
   }
 
@@ -25,7 +23,7 @@ const GlobalLoadingIndicator = () =>  {
 
 const client = createClient({
   url: 'localhost:8080/graphql'
-  exchanges: [exchange]
+  exchanges: [networkStatusExchange()]
 });
 
 const element = (
