@@ -4,15 +4,15 @@ import * as Eq from 'fp-ts/Eq'
 import * as O from 'fp-ts/Option'
 import { map, subscribe } from 'wonka'
 import { useClient } from 'urql'
-import { emptyNetworkStatus, NetworkStatus } from './state'
+import { emptyNetworkStatus, NetworkStatus, OperationError } from './state'
 import { ClientWithNetworkStatus } from './networkStatusExchange'
 import { skipUntilChanged } from './operators'
 
 export const useNetworkStatusSubscription = <A>(
   fa: (state: NetworkStatus) => A,
   empty: A,
-  eq: Eq.Eq<A>
-) => {
+  eq: Eq.Eq<A> = Eq.eqStrict
+): A => {
   const client = useClient() as ClientWithNetworkStatus
   const [state, setState] = useState(empty)
 
@@ -31,23 +31,23 @@ export const useNetworkStatusSubscription = <A>(
 }
 
 export const useUrqlNetworkStatus = () =>
-  useNetworkStatusSubscription(identity, emptyNetworkStatus, Eq.eqStrict)
+  useNetworkStatusSubscription(identity, emptyNetworkStatus)
 
 const pendingQueries = (status: NetworkStatus) => status.query.pending
 
 export const usePendingQueries = () =>
-  useNetworkStatusSubscription(pendingQueries, [], Eq.eqStrict)
+  useNetworkStatusSubscription(pendingQueries, [])
 
 const pendingMutations = (status: NetworkStatus) => status.mutation.pending
 
 export const usePendingMutations = () =>
-  useNetworkStatusSubscription(pendingMutations, [], Eq.eqStrict)
+  useNetworkStatusSubscription(pendingMutations, [])
 
 const numPendingOperations = (status: NetworkStatus) =>
   status.query.pending.length + status.mutation.pending.length
 
 export const useNumPendingOperations = () =>
-  useNetworkStatusSubscription(numPendingOperations, [], Eq.eqStrict)
+  useNetworkStatusSubscription(numPendingOperations, 0)
 
 const getError = (state: NetworkStatus) =>
   pipe(
@@ -55,7 +55,7 @@ const getError = (state: NetworkStatus) =>
     O.alt(() => state.mutation.latestError)
   )
 
-const eqError = O.getEq(Eq.eqStrict)
+const eqError: Eq.Eq<O.Option<OperationError>> = O.getEq(Eq.eqStrict)
 
 export const useError = () =>
   useNetworkStatusSubscription(getError, O.none, eqError)
