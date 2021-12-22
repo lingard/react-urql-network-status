@@ -20,7 +20,7 @@ const GlobalLoadingIndicator = () =>  {
     return null
   }
 
-  return <p>Loading …</p>;
+  return <p>Loading…</p>;
 }
 
 const client = createClient({
@@ -52,12 +52,5 @@ interface NetworkStatus {
     pending: Operation[];
     latestError: Option<CombinedError>
   }
-};
-
-type OperationError = {
-  networkError?: Error | ServerError | ServerParseError;
-  operation?: Operation;
-  response?: ExecutionResult;
-  graphQLErrors?: ReadonlyArray<GraphQLError>;
 };
 ```

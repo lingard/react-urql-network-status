@@ -19,6 +19,10 @@ const shouldHandleOperationType = pipe(
 const shouldHandleOperation = (client: Client) =>
   pipe(shouldHandleOperationType, P.and(P.not(isSuspenseOpertion(client))))
 
+export interface ClientWithNetworkStatus extends Client {
+  _networkStatus: NetworkStatusProgram
+}
+
 export const networkStatusExchange =
   (program: NetworkStatusProgram): Exchange =>
   ({ forward, client }) =>
@@ -26,9 +30,12 @@ export const networkStatusExchange =
     const sharedOps$ = pipe(ops$, share)
     const shouldHandle = shouldHandleOperation(client)
 
+    Object.assign(client, { _networkStatus: program })
+    // client._networkStatus = program
+
     const operations$ = pipe(
       ops$,
-      filter(shouldHandleOperationType),
+      filter(shouldHandle),
       tap((operation) => {
         program.dispatch({
           type: 'Request',

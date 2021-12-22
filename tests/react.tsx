@@ -1,10 +1,12 @@
+import React from 'react'
 import assert from 'assert'
 import {
   Operation,
   Client,
   makeErrorResult,
   ExchangeInput,
-  CombinedError
+  CombinedError,
+  Provider
 } from 'urql'
 import { renderHook, act } from '@testing-library/react-hooks'
 import { pipe } from 'fp-ts/lib/function'
@@ -18,7 +20,7 @@ import {
   operationError
 } from '../src/state'
 import { queryOperation, queryResult } from './utils'
-import { createUseUrqlNetworkStatus } from '../src/useUrqlNetworkStatus'
+import { useUrqlNetworkStatus } from '../src/react'
 
 const error = new Error('')
 const combinedError = new CombinedError({
@@ -33,6 +35,7 @@ let shouldError = false
 let exchangeArgs: ExchangeInput
 let input: Subject<Operation>
 let program: NetworkStatusProgram
+let client: Client
 
 beforeEach(() => {
   shouldRespond = false
@@ -54,16 +57,21 @@ beforeEach(() => {
     )
   }
 
-  exchangeArgs = { forward, client: {} as Client, dispatchDebug }
+  client = {
+    _networkStatus: program
+  } as any as Client
+
+  exchangeArgs = { forward, client, dispatchDebug }
 })
 
 describe('useUrqlNetworkStatus', () => {
   it('should render', () => {
     const { source: ops$, next, complete } = input
     const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
-    const useUrqlNetworkStatus = createUseUrqlNetworkStatus(program)
 
-    const { result } = renderHook(() => useUrqlNetworkStatus())
+    const { result } = renderHook(() => useUrqlNetworkStatus(), {
+      wrapper: ({ children }) => <Provider value={client}>{children}</Provider>
+    })
 
     assert.deepStrictEqual(result.current, emptyNetworkStatus)
 
@@ -88,9 +96,10 @@ describe('useUrqlNetworkStatus', () => {
 
     const { source: ops$, next, complete } = input
     const exchange = networkStatusExchange(program)(exchangeArgs)(ops$)
-    const useUrqlNetworkStatus = createUseUrqlNetworkStatus(program)
 
-    const { result } = renderHook(() => useUrqlNetworkStatus())
+    const { result } = renderHook(() => useUrqlNetworkStatus(), {
+      wrapper: ({ children }) => <Provider value={client}>{children}</Provider>
+    })
 
     assert.deepStrictEqual(result.current, emptyNetworkStatus)
 

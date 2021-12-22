@@ -1,3 +1,3 @@
-export * from './createNetworkStatusNotifier'
-export * from './networkStatusExchange'
 export { NetworkStatus } from './state'
+export * from './networkStatusExchange'
+export * from './react'
