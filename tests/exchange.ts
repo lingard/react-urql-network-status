@@ -7,12 +7,14 @@ import {
 } from 'urql'
 import { makeSubject, pipe, map, publish, Subject, Source } from 'wonka'
 import { queryResult, queryOperation, subscriptionOperation } from './utils'
+import { OperationsStateProgram } from '../src/state'
+import { createOperationsStatusExchange } from '../src/networkStatusExchange'
 import {
-  NetworkStatusProgram,
-  NetworkStatusAction,
-  networkStatusActionError
-} from '../src/state'
-import { createNetworkStatusExchange } from '../src/networkStatusExchange'
+  operationErrorEvent,
+  OperationEvent,
+  operationRequestEvent,
+  operationSuccessEvent
+} from '../src/OperationEvent'
 
 const error = new Error('')
 const combinedError = new CombinedError({
@@ -25,14 +27,14 @@ const dispatchDebug = jest.fn()
 let shouldError = false
 let exchangeArgs: ExchangeInput
 let input: Subject<Operation>
-let program: NetworkStatusProgram
+let program: OperationsStateProgram
 
 beforeEach(() => {
   shouldError = false
   input = makeSubject<Operation>()
   program = {
-    dispatch: jest.fn<void, [NetworkStatusAction]>()
-  } as any as NetworkStatusProgram
+    dispatch: jest.fn<void, [OperationEvent]>()
+  } as any as OperationsStateProgram
 
   const forward = (ops$: Source<Operation>) => {
     return pipe(
@@ -53,54 +55,47 @@ beforeEach(() => {
 describe('networkStatusExchange', () => {
   it('handles successful requests', () => {
     const { source: ops$, next, complete } = input
-    const exchange = createNetworkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = createOperationsStatusExchange(program)(exchangeArgs)(ops$)
 
     publish(exchange)
     next(queryOperation)
     complete()
 
     expect(program.dispatch).toBeCalledTimes(2)
-    expect(program.dispatch).toHaveBeenNthCalledWith(1, {
-      type: 'Request',
-      payload: {
-        operation: queryOperation
-      }
-    })
-    expect(program.dispatch).toHaveBeenNthCalledWith(2, {
-      type: 'Success',
-      payload: {
-        operation: queryOperation,
-        result: queryResult
-      }
-    })
+    expect(program.dispatch).toHaveBeenNthCalledWith(
+      1,
+      operationRequestEvent(queryOperation)
+    )
+    expect(program.dispatch).toHaveBeenNthCalledWith(
+      2,
+      operationSuccessEvent(queryOperation, queryResult)
+    )
   })
 
   it('handles error responses', () => {
     shouldError = true
 
     const { source: ops$, next, complete } = input
-    const exchange = createNetworkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = createOperationsStatusExchange(program)(exchangeArgs)(ops$)
 
     publish(exchange)
     next(queryOperation)
     complete()
 
     expect(program.dispatch).toBeCalledTimes(2)
-    expect(program.dispatch).toHaveBeenNthCalledWith(1, {
-      type: 'Request',
-      payload: {
-        operation: queryOperation
-      }
-    })
+    expect(program.dispatch).toHaveBeenNthCalledWith(
+      1,
+      operationRequestEvent(queryOperation)
+    )
     expect(program.dispatch).toHaveBeenNthCalledWith(
       2,
-      networkStatusActionError(queryOperation, combinedError)
+      operationErrorEvent(queryOperation, combinedError)
     )
   })
 
   it('ignores irrelevant operations', () => {
     const { source: ops$, next, complete } = input
-    const exchange = createNetworkStatusExchange(program)(exchangeArgs)(ops$)
+    const exchange = createOperationsStatusExchange(program)(exchangeArgs)(ops$)
 
     publish(exchange)
     next(subscriptionOperation)

@@ -1,115 +1,27 @@
-import { Operation, CombinedError, OperationResult } from 'urql'
+import { Operation } from 'urql'
 import { OperationTypeNode } from 'graphql'
-import { Program, program } from './program'
-import * as RA from 'fp-ts/ReadonlyArray'
-import { pipe, constant } from 'fp-ts/function'
+import { pipe, constant, flow } from 'fp-ts/function'
 import * as O from 'fp-ts/Option'
 import * as b from 'fp-ts/boolean'
-
-// -------------------------------------------------------------------------------------
-// actions
-// -------------------------------------------------------------------------------------
-
-export interface NetworkStatusActionRequest {
-  type: 'Request'
-  payload: {
-    operation: Operation
-  }
-}
-
-export interface NetworkStatusActionError {
-  type: 'Error'
-  payload: {
-    operation: Operation
-    error: CombinedError
-  }
-}
-
-export interface NetworkStatusActionSuccess {
-  type: 'Success'
-  payload: {
-    operation: Operation
-    result: OperationResult
-  }
-}
-
-export type NetworkStatusAction =
-  | NetworkStatusActionRequest
-  | NetworkStatusActionError
-  | NetworkStatusActionSuccess
-
-export const networkStatusActionRequest = (
-  operation: Operation
-): NetworkStatusActionRequest => ({
-  type: 'Request',
-  payload: {
-    operation
-  }
-})
-
-export const networkStatusActionError = (
-  operation: Operation,
-  error: CombinedError
-): NetworkStatusActionError => ({
-  type: 'Error',
-  payload: {
-    operation,
-    error
-  }
-})
-
-export const networkStatusActionSuccess = (
-  operation: Operation,
-  result: OperationResult
-): NetworkStatusActionSuccess => ({
-  type: 'Success',
-  payload: {
-    operation,
-    result
-  }
-})
-
-export const matchNetworkStatusAction =
-  <A>(patterns: {
-    [K in NetworkStatusAction['type']]: (
-      t: Extract<NetworkStatusAction, { type: K }>
-    ) => A
-  }) =>
-  (
-    f: Pick<NetworkStatusAction, 'type'> &
-      Partial<Omit<NetworkStatusAction, 'type'>>
-  ) =>
-    patterns[f.type](f as any)
+import * as RA from 'fp-ts/ReadonlyArray'
+import * as RNEA from 'fp-ts/ReadonlyNonEmptyArray'
+import * as OperationStatus from './OperationStatus'
+import * as OperationEvent from './OperationEvent'
+import { Program, program } from './program'
+import { operationError } from './OperationError'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
 
-export interface OperationError {
-  operation: Operation
-  error: CombinedError
+export interface OperationsState {
+  query: OperationStatus.OperationsStatus
+  mutation: OperationStatus.OperationsStatus
 }
 
-export const operationError = (error: OperationError): OperationError => error
-
-export interface OperationStatus {
-  pending: ReadonlyArray<Operation>
-  latestError: O.Option<OperationError>
-}
-
-export interface NetworkStatus {
-  query: OperationStatus
-  mutation: OperationStatus
-}
-
-const emptyOperationState: OperationStatus = {
-  pending: [],
-  latestError: O.none
-}
-
-export const emptyNetworkStatus: NetworkStatus = {
-  query: emptyOperationState,
-  mutation: emptyOperationState
+export const emptyOperationsState: OperationsState = {
+  query: OperationStatus.empty,
+  mutation: OperationStatus.empty
 }
 
 // -------------------------------------------------------------------------------------
@@ -123,65 +35,63 @@ const withoutOperation =
       RA.filter((b) => a.key !== b.key)
     )
 
-export const pendingOperations = (
-  state: ReadonlyArray<Operation> = [],
-  action: NetworkStatusAction
-): ReadonlyArray<Operation> =>
+const updateStatus = (
+  state: OperationStatus.OperationsStatus,
+  action: OperationEvent.OperationEvent
+): OperationStatus.OperationsStatus =>
   pipe(
     action,
-    matchNetworkStatusAction({
-      Request: ({ payload }) => pipe(state, RA.append(payload.operation)),
+    OperationEvent.match({
+      Request: ({ payload }) =>
+        OperationStatus.Monoid.concat(
+          state,
+          OperationStatus.pending([payload.operation])
+        ),
       Success: ({ payload }) =>
-        pipe(state, withoutOperation(payload.result.operation)),
-      Error: ({ payload }) => pipe(state, withoutOperation(payload.operation))
-    })
-  )
-
-export const latestOperationError = (
-  state: O.Option<OperationError>,
-  action: NetworkStatusAction
-): O.Option<OperationError> =>
-  pipe(
-    action,
-    matchNetworkStatusAction<O.Option<OperationError>>({
-      Request: () => O.none,
-      Error: ({ payload }) => O.some(payload),
-      Success: (action) => {
-        const { result } = action.payload
-
-        if (result.error) {
-          const { error, operation } = result
-
-          return O.some({
-            error,
-            operation
-          })
-        }
-
-        return state
-      }
+        pipe(
+          state,
+          OperationStatus.match(
+            constant(OperationStatus.idle),
+            OperationStatus.failure,
+            flow(
+              withoutOperation(payload.operation),
+              RNEA.fromReadonlyArray,
+              O.fold(constant(OperationStatus.idle), OperationStatus.pending)
+            )
+          )
+        ),
+      Error: ({ payload }) =>
+        OperationStatus.Monoid.concat(
+          state,
+          OperationStatus.failure([
+            operationError({
+              operation: payload.operation,
+              error: payload.error
+            })
+          ])
+        )
     })
   )
 
 const operationTypeReducer =
   (type: OperationTypeNode) =>
-  (state: OperationStatus, action: NetworkStatusAction) =>
+  (
+    state: OperationStatus.OperationsStatus,
+    action: OperationEvent.OperationEvent
+  ) =>
     pipe(
       action,
-      isOperationActionType(type),
-      b.fold(constant(state), () => ({
-        pending: pendingOperations(state.pending, action),
-        latestError: latestOperationError(state.latestError, action)
-      }))
+      OperationEvent.isOperationType(type),
+      b.fold(constant(state), () => updateStatus(state, action))
     )
 
 const queryReducer = operationTypeReducer('query')
 const mutationReducer = operationTypeReducer('mutation')
 
 export const update = (
-  state: NetworkStatus = emptyNetworkStatus,
-  action: NetworkStatusAction
-): NetworkStatus => ({
+  state: OperationsState = emptyOperationsState,
+  action: OperationEvent.OperationEvent
+): OperationsState => ({
   query: queryReducer(state.query, action),
   mutation: mutationReducer(state.mutation, action)
 })
@@ -190,10 +100,16 @@ export const update = (
 // program
 // -------------------------------------------------------------------------------------
 
-export type NetworkStatusProgram = Program<NetworkStatusAction, NetworkStatus>
+export type OperationsStateProgram = Program<
+  OperationEvent.OperationEvent,
+  OperationsState
+>
 
-export const networkStatusProgram = () =>
-  program<NetworkStatus, NetworkStatusAction>(emptyNetworkStatus, update)
+export const operationsStateProgram = (): OperationsStateProgram =>
+  program<OperationsState, OperationEvent.OperationEvent>(
+    emptyOperationsState,
+    update
+  )
 
 // -------------------------------------------------------------------------------------
 // utils
@@ -201,12 +117,4 @@ export const networkStatusProgram = () =>
 
 export const isOperationType =
   (type: OperationTypeNode) => (operation: Operation) =>
-    operation.query.definitions.some(
-      (definition) =>
-        definition.kind === 'OperationDefinition' &&
-        definition.operation === type
-    )
-
-export const isOperationActionType =
-  (type: OperationTypeNode) => (action: NetworkStatusAction) =>
-    pipe(action.payload.operation, isOperationType(type))
+    operation.kind === type

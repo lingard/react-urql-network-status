@@ -11,15 +11,13 @@ import {
 import { renderHook, act } from '@testing-library/react-hooks'
 import { pipe } from 'fp-ts/lib/function'
 import { map, makeSubject, publish, filter, Subject, Source } from 'wonka'
-import { some } from 'fp-ts/lib/Option'
 import { networkStatusExchange } from '../src'
-import {
-  emptyNetworkStatus,
-  NetworkStatusProgram,
-  operationError
-} from '../src/state'
+import { emptyOperationsState, OperationsStateProgram } from '../src/state'
 import { queryOperation, queryResult } from './utils'
-import { useUrqlNetworkStatus } from '../src/react'
+import { useUrqlOperationsStatus } from '../src/react'
+import { operationError } from '../src/OperationError'
+import * as OperationStatus from '../src/OperationStatus'
+import { ClientWithOperationsStatusState } from '../src/networkStatusExchange'
 
 const error = new Error('')
 const combinedError = new CombinedError({
@@ -33,7 +31,7 @@ let shouldRespond = false
 let shouldError = false
 let exchangeArgs: ExchangeInput
 let input: Subject<Operation>
-let program: NetworkStatusProgram
+let program: OperationsStateProgram
 let client: Client
 
 beforeEach(() => {
@@ -56,22 +54,22 @@ beforeEach(() => {
   }
 
   client = {
-    _networkStatus: program
-  } as any as Client
+    _operationsStatusState: program
+  } as any as ClientWithOperationsStatusState
 
   exchangeArgs = { forward, client, dispatchDebug }
 })
 
-describe('useUrqlNetworkStatus', () => {
+describe('useUrqlOperationsStatus', () => {
   it('should render', () => {
     const { source: ops$, next, complete } = input
     const exchange = networkStatusExchange()(exchangeArgs)(ops$)
 
-    const { result } = renderHook(() => useUrqlNetworkStatus(), {
+    const { result } = renderHook(() => useUrqlOperationsStatus(), {
       wrapper: ({ children }) => <Provider value={client}>{children}</Provider>
     })
 
-    assert.deepStrictEqual(result.current, emptyNetworkStatus)
+    assert.deepStrictEqual(result.current, emptyOperationsState)
 
     act(() => {
       publish(exchange)
@@ -80,11 +78,8 @@ describe('useUrqlNetworkStatus', () => {
     })
 
     assert.deepStrictEqual(result.current, {
-      ...emptyNetworkStatus,
-      query: {
-        ...emptyNetworkStatus.query,
-        pending: [queryOperation]
-      }
+      ...emptyOperationsState,
+      query: OperationStatus.pending([queryOperation])
     })
   })
 
@@ -95,11 +90,11 @@ describe('useUrqlNetworkStatus', () => {
     const { source: ops$, next, complete } = input
     const exchange = networkStatusExchange()(exchangeArgs)(ops$)
 
-    const { result } = renderHook(() => useUrqlNetworkStatus(), {
+    const { result } = renderHook(() => useUrqlOperationsStatus(), {
       wrapper: ({ children }) => <Provider value={client}>{children}</Provider>
     })
 
-    assert.deepStrictEqual(result.current, emptyNetworkStatus)
+    assert.deepStrictEqual(result.current, emptyOperationsState)
 
     act(() => {
       publish(exchange)
@@ -108,16 +103,13 @@ describe('useUrqlNetworkStatus', () => {
     })
 
     assert.deepStrictEqual(result.current, {
-      ...emptyNetworkStatus,
-      query: {
-        ...emptyNetworkStatus.query,
-        latestError: some(
-          operationError({
-            operation: queryOperation,
-            error: combinedError
-          })
-        )
-      }
+      ...emptyOperationsState,
+      query: OperationStatus.failure([
+        operationError({
+          operation: queryOperation,
+          error: combinedError
+        })
+      ])
     })
   })
 })

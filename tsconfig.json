@@ -12,6 +12,6 @@
   },
   "include": [
     "example",
-    "src"
+    "src", "__tests__"
   ]
 }

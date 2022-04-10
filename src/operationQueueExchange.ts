@@ -13,10 +13,8 @@ const shouldHandleOperationType = pipe(
   P.or(isOperationType('query'))
 )
 
-
-
 export interface ClientWithOperationsStatusState extends Client {
-  _operationsStatusState: S.OperationsStateProgram
+  operationQueue$: S.OperationsStateProgram
 }
 
 export const createOperationsStatusExchange =
@@ -35,14 +33,6 @@ export const createOperationsStatusExchange =
       }),
       forward,
       tap((result) => {
-        if (result.error) {
-          state.dispatch(
-            OperationEvent.operationErrorEvent(result.operation, result.error)
-          )
-
-          return
-        }
-
         state.dispatch(
           OperationEvent.operationSuccessEvent(result.operation, result)
         )
